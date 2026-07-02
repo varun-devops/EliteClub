@@ -10,3 +10,6 @@
 - Experiments (use with caution):
   · optimizePackageImports
 
+ GET / 200 in 4.3s (next.js: 1388ms, application-code: 2.9s)
+ GET /api/slots 200 in 4.7s (next.js: 3.1s, application-code: 1601ms)
+ GET /register/influencer 200 in 610ms (next.js: 105ms, application-code: 505ms)
