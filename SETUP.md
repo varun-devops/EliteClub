@@ -93,16 +93,104 @@ view uploaded files, change status, mark verified, mark payment as paid, and add
 
 ---
 
-## Payments (current behaviour)
+## 6. Razorpay — take real payments into your bank account
 
-As requested, payments are **tracked, not charged** for now:
-- Influencer registration captures a **₹1,100** fee → saved as `payment_status = pending`.
-- Photographer / Videographer → **free** → `payment_status = waived`.
-- Business requirement posting captures **₹1,100** → `pending`.
-- In the admin panel you can flip any record's payment to **Paid**.
+Razorpay is wired in and ready. Until you add keys, the site keeps the old behaviour
+(fee saved as `pending`, your team collects manually). The moment real keys are present,
+a **Pay Securely** button appears on the confirmation screen automatically.
 
-To add a real gateway later (e.g. Razorpay), wire it into the form's submit step and update
-`payment_status` to `paid` on a verified payment webhook. The data model is already ready for it.
+### 6a. Open the account (1–2 working days)
+
+1. Sign up at **https://razorpay.com** with your business email.
+2. Complete **KYC**: PAN, address proof, and **your bank account number + IFSC**.
+   That bank account is where every payment eventually lands — get it right.
+   - Sole proprietor / individual is accepted; a registered company gets approved faster.
+3. While KYC is pending you already get **Test Mode** keys, so you can build and test today.
+
+### 6b. Create the tables
+
+Supabase → **SQL Editor** → **New query** → paste all of
+[`supabase-payments.sql`](./supabase-payments.sql) → **Run**.
+
+### 6c. Get your API keys
+
+Razorpay Dashboard → **Account & Settings** → **API Keys** → **Generate Key**.
+The secret is shown **once** — copy it immediately.
+
+```env
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx   # public, safe in the browser
+RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxx            # SECRET — server only
+```
+
+### 6d. Set up the webhook (do not skip this)
+
+The webhook is what protects you when a customer pays and then closes the tab before the
+browser can tell your server. Razorpay calls you directly, server to server.
+
+Razorpay Dashboard → **Settings** → **Webhooks** → **Add New Webhook**:
+
+| Field | Value |
+|-------|-------|
+| Webhook URL | `https://your-domain.com/api/payment/webhook` |
+| Secret | any long random string — paste the **same** value into `RAZORPAY_WEBHOOK_SECRET` |
+| Active Events | `payment.captured` and `payment.failed` |
+
+```env
+RAZORPAY_WEBHOOK_SECRET=the-same-long-random-string
+```
+
+> Localhost has no public URL, so webhooks can't reach your laptop. Either test the webhook
+> after deploying to Vercel, or tunnel with `npx localtunnel --port 3000`.
+
+### 6e. Test before going live
+
+With `rzp_test_` keys, submit a registration and pay using Razorpay's test instruments:
+
+- **Card:** `4111 1111 1111 1111`, any future expiry, any CVV
+- **UPI:** `success@razorpay` (and `failure@razorpay` to test a failed payment)
+
+Then check: the `payments` row shows `status = paid`, and the registration in
+`/admin` shows **Paid**.
+
+### 6f. Go live
+
+1. KYC approved → Razorpay Dashboard → switch to **Live Mode** → generate **live** keys.
+2. Replace the keys in Vercel's Environment Variables with the `rzp_live_...` pair.
+3. Add a **second webhook** for the live mode pointing at the same URL (test and live
+   webhooks are configured separately).
+4. Redeploy. Do one real ₹1 test payment to yourself before announcing.
+
+### How the money reaches your bank
+
+```
+Customer pays (UPI / card / netbanking)
+        ↓
+Razorpay collects and auto-captures it
+        ↓
+Razorpay deducts its fee (~2% + 18% GST on that fee)
+        ↓
+T+2 working days — settled into your bank account, automatically
+        ↓
+Dashboard → Settlements shows every payout and its UTR
+```
+
+You do nothing to trigger payouts — they are automatic once your bank account is verified.
+Settlement is **T+2 working days** by default (T+1 available on request for a small fee).
+
+### What each part of the code does
+
+| File | Role |
+|------|------|
+| `src/lib/payments/razorpay.ts` | Talks to Razorpay's API; verifies signatures |
+| `src/lib/payments/orders.ts` | Links a Razorpay order to a registration / business post |
+| `src/app/api/payment/order/route.ts` | Creates the order — **amount is read from the DB, never the browser** |
+| `src/app/api/payment/verify/route.ts` | Confirms the payment when the browser returns |
+| `src/app/api/payment/webhook/route.ts` | Razorpay → server safety net; the source of truth |
+| `src/components/payments/PayNow.tsx` | The Pay button + Razorpay Checkout popup |
+
+**Security note:** the browser only ever sends the submission `id`. The server looks up the
+fee in the database, so a customer cannot edit the amount and pay ₹1 instead of ₹1,100.
+Every payment is checked against Razorpay's HMAC signature before anything is marked paid.
 
 ---
 
@@ -115,7 +203,8 @@ To add a real gateway later (e.g. Razorpay), wire it into the form's submit step
 | Public pages | `src/app/(public)/` |
 | API routes | `src/app/api/` |
 | Admin panel | `src/app/admin/` + `src/components/admin/` |
+| Payments (Razorpay) | `src/lib/payments/` + `src/app/api/payment/` |
 | Domain data (states, packages, fees, hero images) | `src/lib/constants.ts` |
-| Database schema | `supabase-schema.sql` |
+| Database schema | `supabase-schema.sql` + `supabase-payments.sql` |
 
 To swap the hero / parallax model photos, edit `HERO_IMAGES` in `src/lib/constants.ts`.

@@ -13,6 +13,7 @@ enquiry flow; and a password-protected admin panel to verify and manage every su
 - **Framer Motion** — scroll-driven parallax hero & sections
 - **Supabase** (Postgres) — stores all registrations, business posts, enquiries
 - **Cloudinary** — unsigned uploads for photos, portfolios, videos, government IDs
+- **Razorpay** — UPI / cards / net banking, with signature-verified webhooks
 
 ## Quick start
 

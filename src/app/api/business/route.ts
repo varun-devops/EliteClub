@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin'
 import { FEES } from '@/lib/constants'
+import { isRazorpayConfigured } from '@/lib/payments/razorpay'
 
 export const runtime = 'nodejs'
 
@@ -87,12 +88,22 @@ export async function POST(req: Request) {
         { status: 500 }
       )
     }
+    const fee = FEES.businessPosting
+    const paymentEnabled = fee > 0 && isRazorpayConfigured()
+
     return NextResponse.json({
       ok: true,
       id: data.id,
-      message: `Requirement posted! A posting fee of ₹${FEES.businessPosting.toLocaleString(
-        'en-IN'
-      )} applies. Our team will reach out with shortlisted talent and payment details.`,
+      fee,
+      requiresPayment: fee > 0,
+      paymentEnabled,
+      message: paymentEnabled
+        ? `Requirement posted! Complete your ₹${fee.toLocaleString(
+            'en-IN'
+          )} posting fee below and our team will start shortlisting verified talent.`
+        : `Requirement posted! A posting fee of ₹${fee.toLocaleString(
+            'en-IN'
+          )} applies. Our team will reach out with shortlisted talent and payment details.`,
     })
   } catch (e) {
     console.error('[business] unexpected:', e)

@@ -5,12 +5,14 @@ import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 import { Field, Input, Select, PillGroup, Textarea } from './Fields'
 import FileUpload from './FileUpload'
-import SuccessCard from './SuccessCard'
+import SuccessCard, { type PendingPayment } from './SuccessCard'
 import { INDIAN_STATES, BUSINESS_TYPES, HIRING_OPTIONS } from '@/lib/constants'
 
 export default function BusinessForm() {
   const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState<null | { title: string; message: string }>(null)
+  const [done, setDone] = useState<
+    null | { title: string; message: string; payment: PendingPayment | null }
+  >(null)
   const [hiringFor, setHiringFor] = useState<string[]>([])
   const [logo, setLogo] = useState<string | null>(null)
 
@@ -44,7 +46,13 @@ export default function BusinessForm() {
         setSubmitting(false)
         return
       }
-      setDone({ title: 'Requirement Posted', message: data.message })
+      setDone({
+        title: 'Requirement Posted',
+        message: data.message,
+        payment: data.paymentEnabled
+          ? { entityType: 'business', entityId: data.id, amount: data.fee }
+          : null,
+      })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {
       toast.error('Network error. Please try again.')
@@ -52,7 +60,7 @@ export default function BusinessForm() {
     }
   }
 
-  if (done) return <SuccessCard title={done.title} message={done.message} />
+  if (done) return <SuccessCard title={done.title} message={done.message} payment={done.payment} />
 
   return (
     <form onSubmit={handleSubmit} className="space-y-10">

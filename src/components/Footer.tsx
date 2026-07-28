@@ -53,6 +53,13 @@ export default function Footer() {
             <a href="mailto:hello@eliteclub.in" aria-label="Email" className="hover:text-gold"><Mail size={18} /></a>
           </div>
         </div>
+
+        {/* Powered-by credit */}
+        <div className="pt-6 text-center">
+          <p className="font-montserrat text-[11px] tracking-[0.25em] uppercase text-cream/35">
+            Powered by <span className="text-gold-light">Reckon</span>
+          </p>
+        </div>
       </div>
     </footer>
   )

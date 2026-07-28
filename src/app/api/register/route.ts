@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin'
 import { ROLE_META } from '@/lib/constants'
 import { countInfluencerRegistrations, deriveSlotInfo } from '@/lib/slots'
+import { isRazorpayConfigured } from '@/lib/payments/razorpay'
 
 export const runtime = 'nodejs'
 
@@ -138,14 +139,23 @@ export async function POST(req: Request) {
 
     const isFreeInfluencer = role === 'influencer' && fee === 0
 
+    // When the gateway is live the user pays right here; otherwise we fall back
+    // to the original "our team will share payment details" flow.
+    const paymentEnabled = fee > 0 && isRazorpayConfigured()
+
     return NextResponse.json({
       ok: true,
       id: data.id,
       fee,
       requiresPayment: fee > 0,
+      paymentEnabled,
       message:
         fee > 0
-          ? `Registration received! A fee of ₹${fee.toLocaleString('en-IN')} applies. Our team will share payment details and verify your profile shortly.`
+          ? paymentEnabled
+            ? `Registration received! Complete your ₹${fee.toLocaleString(
+                'en-IN'
+              )} payment below to confirm your spot.`
+            : `Registration received! A fee of ₹${fee.toLocaleString('en-IN')} applies. Our team will share payment details and verify your profile shortly.`
           : isFreeInfluencer
             ? 'Registration received — and your fee is waived! You claimed one of the first 100 free spots. Our team will verify your profile shortly.'
             : 'Registration received! Our team will verify your profile shortly.',
