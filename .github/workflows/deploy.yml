@@ -1,0 +1,51 @@
+# ════════════════════════════════════════════════════════════════════
+#  Auto-deploy to the Hostinger VPS on every push to main.
+#
+#  Required GitHub repository secrets
+#  (Repo → Settings → Secrets and variables → Actions → New secret):
+#
+#    VPS_HOST         your VPS IP, e.g. 72.60.12.34
+#    VPS_USER         the SSH user, e.g. root  (or a deploy user)
+#    VPS_SSH_KEY      the PRIVATE key whose .pub is in the VPS
+#                     ~/.ssh/authorized_keys — paste the whole file
+#                     including the BEGIN/END lines
+#    VPS_PORT         SSH port (optional, defaults to 22)
+#
+#  This does NOT build here — it tells the VPS to pull and build itself,
+#  so no secrets or build artifacts ever leave the server.
+# ════════════════════════════════════════════════════════════════════
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  # Lets you re-run a deploy from the Actions tab without a new commit.
+  workflow_dispatch:
+
+# If you push twice quickly, finish the first deploy before starting the
+# second — two concurrent builds on a small VPS will run it out of memory.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & restart on VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -e
+            export PATH="$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+            cd /var/www/elite-club
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh

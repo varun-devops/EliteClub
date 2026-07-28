@@ -6,6 +6,8 @@ to "fully working with a live database and file uploads."
 Everything is already coded. You just paste 4–5 keys into `.env.local`, run one SQL file,
 and you're live.
 
+To put it on your Hostinger VPS with your GoDaddy domain, see **[DEPLOY.md](./DEPLOY.md)**.
+
 ---
 
 ## 0. Run it locally (already works)
@@ -83,13 +85,20 @@ view uploaded files, change status, mark verified, mark payment as paid, and add
 
 ---
 
-## 5. Deploy (Vercel — free)
+## 5. Deploy (Hostinger VPS + GoDaddy domain)
 
-1. Push this folder to a GitHub repo.
-2. Go to **https://vercel.com** → **New Project** → import the repo.
-3. In **Environment Variables**, add the **same keys** from your `.env.local`
-   (all of them, including `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET`).
-4. Deploy. Your site is live. The admin cookie is automatically `Secure` in production.
+Full step-by-step instructions live in **[DEPLOY.md](./DEPLOY.md)**. The short version:
+
+1. Hostinger VPS (Ubuntu 24.04, **2 GB RAM minimum**) → install Node 22, PM2, Nginx.
+2. `git clone` the repo to `/var/www/elite-club`.
+3. Create `.env.local` **on the server** (it is never committed to GitHub).
+4. Run `./scripts/deploy.sh` — installs, builds, starts under PM2.
+5. Point your GoDaddy domain's `A` records at the VPS IP.
+6. Nginx reverse proxy + free SSL via Certbot.
+7. Add the GitHub secrets so every `git push` to `main` deploys automatically.
+
+> This app needs a real Node.js process (API routes, middleware, server-side DB calls),
+> so Hostinger's **shared web hosting will not run it** — a VPS is required.
 
 ---
 
@@ -107,10 +116,15 @@ a **Pay Securely** button appears on the confirmation screen automatically.
    - Sole proprietor / individual is accepted; a registered company gets approved faster.
 3. While KYC is pending you already get **Test Mode** keys, so you can build and test today.
 
-### 6b. Create the tables
+### 6b. Create the payments table
 
-Supabase → **SQL Editor** → **New query** → paste all of
-[`supabase-payments.sql`](./supabase-payments.sql) → **Run**.
+The `payments` table is part of [`supabase-schema.sql`](./supabase-schema.sql), so if you
+run that file (step 1) you already have it — nothing to do here.
+
+**If your database was created before payments were added**, run the add-on migration
+instead: Supabase → **SQL Editor** → **New query** → paste all of
+[`supabase-payments.sql`](./supabase-payments.sql) → **Run**. It only adds the new table and
+leaves your existing data alone.
 
 ### 6c. Get your API keys
 
@@ -140,7 +154,7 @@ RAZORPAY_WEBHOOK_SECRET=the-same-long-random-string
 ```
 
 > Localhost has no public URL, so webhooks can't reach your laptop. Either test the webhook
-> after deploying to Vercel, or tunnel with `npx localtunnel --port 3000`.
+> after deploying to your Hostinger VPS (see DEPLOY.md), or tunnel with `npx localtunnel --port 3000`.
 
 ### 6e. Test before going live
 
@@ -155,10 +169,10 @@ Then check: the `payments` row shows `status = paid`, and the registration in
 ### 6f. Go live
 
 1. KYC approved → Razorpay Dashboard → switch to **Live Mode** → generate **live** keys.
-2. Replace the keys in Vercel's Environment Variables with the `rzp_live_...` pair.
-3. Add a **second webhook** for the live mode pointing at the same URL (test and live
+2. Replace the keys in `.env.local` **on the VPS** with the `rzp_live_...` pair, then `pm2 reload elite-club --update-env`.
+3. Add a **second webhook** for live mode pointing at the same URL (test and live
    webhooks are configured separately).
-4. Redeploy. Do one real ₹1 test payment to yourself before announcing.
+4. Do one real ₹1 test payment to yourself before announcing.
 
 ### How the money reaches your bank
 
@@ -205,6 +219,8 @@ Every payment is checked against Razorpay's HMAC signature before anything is ma
 | Admin panel | `src/app/admin/` + `src/components/admin/` |
 | Payments (Razorpay) | `src/lib/payments/` + `src/app/api/payment/` |
 | Domain data (states, packages, fees, hero images) | `src/lib/constants.ts` |
-| Database schema | `supabase-schema.sql` + `supabase-payments.sql` |
+| Database schema (complete) | `supabase-schema.sql` |
+| Payments-only migration (existing DBs) | `supabase-payments.sql` |
+| Deployment | `DEPLOY.md`, `scripts/deploy.sh`, `ecosystem.config.cjs`, `deploy/`, `.github/workflows/` |
 
 To swap the hero / parallax model photos, edit `HERO_IMAGES` in `src/lib/constants.ts`.

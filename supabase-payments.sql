@@ -1,9 +1,18 @@
 -- ════════════════════════════════════════════════════════════════════
 --  ELITE CLUB — Payments (Razorpay) migration
 --
+--  ⚠ You usually do NOT need this file.
+--    The `payments` table is now part of supabase-schema.sql. If you are
+--    setting up a fresh database, just run that one file — it has
+--    everything.
+--
+--    This file exists only for a database created BEFORE payments were
+--    added: it adds the payments table on its own, without touching the
+--    tables you already have data in.
+--
 --  HOW TO RUN:
 --    Supabase → SQL Editor → New query → paste this file → Run.
---    Run AFTER supabase-schema.sql. Safe to re-run.
+--    Safe to re-run.
 --
 --  One row per Razorpay order. This is the money audit trail — it stays
 --  even if a registration is later edited or rejected.

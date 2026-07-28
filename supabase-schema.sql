@@ -128,6 +128,47 @@ create table if not exists public.enquiries (
 );
 
 -- ─────────────────────────────────────────────────────────────────────
+--  PAYMENTS (Razorpay)
+--  One row per Razorpay order — the money audit trail. It is kept even
+--  if the registration it belongs to is later edited or rejected.
+--  NOTE: `amount` is in PAISE (₹1,100 -> 110000), matching Razorpay.
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists public.payments (
+  id uuid default uuid_generate_v4() primary key,
+
+  -- what is being paid for
+  entity_type text not null check (entity_type in ('registration','business')),
+  entity_id   uuid not null,          -- registrations.id or business_posts.id
+
+  -- gateway identifiers
+  gateway    text not null default 'razorpay',
+  order_id   text not null unique,    -- Razorpay order_id  (order_XXXXXXXX)
+  payment_id text,                    -- Razorpay payment_id (pay_XXXXXXXX)
+  signature  text,                    -- checkout signature we verified
+
+  amount   integer not null,          -- PAISE
+  currency text not null default 'INR',
+
+  status text not null default 'created'
+          check (status in ('created','attempted','paid','failed','refunded')),
+  method text,                        -- upi / card / netbanking / wallet
+
+  -- payer contact as captured at order time (helps reconcile disputes)
+  email   text,
+  contact text,
+
+  error_description text,
+  paid_at    timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists payments_entity_idx     on public.payments (entity_type, entity_id);
+create index if not exists payments_payment_id_idx on public.payments (payment_id);
+create index if not exists payments_status_idx     on public.payments (status);
+create index if not exists payments_created_idx    on public.payments (created_at desc);
+
+-- ─────────────────────────────────────────────────────────────────────
 --  keep updated_at fresh
 -- ─────────────────────────────────────────────────────────────────────
 create or replace function public.touch_updated_at()
@@ -146,6 +187,10 @@ drop trigger if exists trg_business_touch on public.business_posts;
 create trigger trg_business_touch before update on public.business_posts
   for each row execute procedure public.touch_updated_at();
 
+drop trigger if exists trg_payments_touch on public.payments;
+create trigger trg_payments_touch before update on public.payments
+  for each row execute procedure public.touch_updated_at();
+
 -- ─────────────────────────────────────────────────────────────────────
 --  ROW LEVEL SECURITY
 --
@@ -157,9 +202,10 @@ create trigger trg_business_touch before update on public.business_posts
 alter table public.registrations  enable row level security;
 alter table public.business_posts enable row level security;
 alter table public.enquiries      enable row level security;
+alter table public.payments       enable row level security;
 
 -- (Intentionally NO permissive policies. Service-role bypasses RLS.)
 
 -- ════════════════════════════════════════════════════════════════════
---  Done. Tables: registrations, business_posts, enquiries.
+--  Done. Tables: registrations, business_posts, enquiries, payments.
 -- ════════════════════════════════════════════════════════════════════
