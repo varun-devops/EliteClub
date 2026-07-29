@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { Users, Crown, Camera, Video, Building2, MessageSquare, Clock, BadgeCheck } from 'lucide-react'
+import { Users, Crown, Camera, Video, Building2, MessageSquare, Clock, BadgeCheck, IndianRupee } from 'lucide-react'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/admin'
 import StatCard from '@/components/admin/StatCard'
 import AdminHeader from '@/components/admin/AdminHeader'
 import NotConfigured from '@/components/admin/NotConfigured'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatINR } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +17,17 @@ async function getStats() {
     return count ?? 0
   }
 
+  // The payments table may not exist yet (supabase-payments.sql), so this is
+  // read separately and degrades to zero instead of breaking the dashboard.
+  const paidTotal = async () => {
+    const { data, error } = await supabase.from('payments').select('amount').eq('status', 'paid')
+    if (error || !data) return 0
+    return data.reduce((sum: number, r: any) => sum + (r.amount ?? 0), 0) / 100
+  }
+
   const [
     totalReg, influencers, photographers, videographers,
-    pendingReg, verifiedReg, businesses, enquiries, recent,
+    pendingReg, verifiedReg, businesses, enquiries, recent, collected,
   ] = await Promise.all([
     countOf('registrations'),
     countOf('registrations', (q) => q.eq('role', 'influencer')),
@@ -34,11 +42,12 @@ async function getStats() {
       .select('id, full_name, role, state, status, created_at')
       .order('created_at', { ascending: false })
       .limit(8),
+    paidTotal(),
   ])
 
   return {
     totalReg, influencers, photographers, videographers,
-    pendingReg, verifiedReg, businesses, enquiries,
+    pendingReg, verifiedReg, businesses, enquiries, collected,
     recent: recent.data ?? [],
   }
 }
@@ -59,7 +68,7 @@ export default async function AdminDashboard() {
   const configured = isSupabaseConfigured()
   const stats = configured
     ? await getStats()
-    : { totalReg: 0, influencers: 0, photographers: 0, videographers: 0, pendingReg: 0, verifiedReg: 0, businesses: 0, enquiries: 0, recent: [] as any[] }
+    : { totalReg: 0, influencers: 0, photographers: 0, videographers: 0, pendingReg: 0, verifiedReg: 0, businesses: 0, enquiries: 0, collected: 0, recent: [] as any[] }
 
   return (
     <div className="p-6 sm:p-10">
@@ -78,6 +87,7 @@ export default async function AdminDashboard() {
         <StatCard label="Influencers" value={stats.influencers} icon={Crown} href="/admin/registrations?role=influencer" />
         <StatCard label="Photographers" value={stats.photographers} icon={Camera} href="/admin/registrations?role=photographer" />
         <StatCard label="Videographers" value={stats.videographers} icon={Video} href="/admin/registrations?role=videographer" />
+        <StatCard label="Collected" value={formatINR(stats.collected)} icon={IndianRupee} href="/admin/payments" />
         <StatCard label="Enquiries" value={stats.enquiries} icon={MessageSquare} href="/admin/enquiries" />
       </div>
 

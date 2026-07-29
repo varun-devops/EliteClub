@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Shield, Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import Logo from '@/components/Logo'
 
 function LoginInner() {
@@ -10,6 +10,7 @@ function LoginInner() {
   const params = useSearchParams()
   const next = params.get('next') || '/admin'
 
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,7 +24,7 @@ function LoginInner() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -58,14 +59,34 @@ function LoginInner() {
             </div>
           )}
           <div>
-            <label className="field-label">Admin Password</label>
+            <label className="field-label">Email</label>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus
+                autoComplete="username"
+                className="field pr-11"
+                placeholder="you@example.com"
+              />
+              <Mail
+                size={16}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gold/50 pointer-events-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label">Password</label>
             <div className="relative">
               <input
                 type={show ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoFocus
+                autoComplete="current-password"
                 className="field pr-11"
                 placeholder="••••••••"
               />

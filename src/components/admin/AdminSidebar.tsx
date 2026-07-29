@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, Building2, MessageSquare, LogOut, ExternalLink } from 'lucide-react'
+import { LayoutDashboard, Users, Building2, MessageSquare, IndianRupee, LogOut, ExternalLink } from 'lucide-react'
 import Logo from '@/components/Logo'
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/registrations', label: 'Registrations', icon: Users },
   { href: '/admin/businesses', label: 'Business Posts', icon: Building2 },
+  { href: '/admin/payments', label: 'Payments', icon: IndianRupee },
   { href: '/admin/enquiries', label: 'Enquiries', icon: MessageSquare },
 ]
 
