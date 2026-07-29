@@ -97,24 +97,62 @@ Vercel will show you the DNS records it wants. They will look like this:
 
 **Use the exact values Vercel shows you**, not the ones above — they change.
 
-### 4b. Update DNS in Hostinger
+### 4b. Update DNS — in Hostinger, NOT GoDaddy
 
-Your nameservers are Hostinger's (`atlas.dns-parking.com` / `hyperion.dns-parking.com`),
-so DNS is edited in Hostinger — **not** GoDaddy.
+The domain is **registered** at GoDaddy, but its **nameservers point to Hostinger**:
 
-hPanel → **Domains** → `eliteclubofficial.com` → **DNS / Nameservers** → **DNS Records**.
+```
+eliteclubofficial.com  nameserver = atlas.dns-parking.com
+eliteclubofficial.com  nameserver = hyperion.dns-parking.com
+```
 
-1. **Delete** the existing `A` record for `@` that points to `157.173.216.160`
-   (that is your shared-hosting IP).
-2. **Delete** the existing `CNAME` for `www`, if there is one.
-3. **Add** the records Vercel gave you in step 4a.
-4. Leave `MX` and `TXT` records **alone** — those are your email. Deleting them breaks it.
+Whoever the nameservers point to is the one who answers DNS. So **editing records in
+GoDaddy will do nothing.** All DNS changes happen in Hostinger hPanel.
+
+Go to hPanel → **Domains** → `eliteclubofficial.com` → **DNS / Nameservers** → **DNS Records**.
+
+#### Delete these
+
+| Type | Name | Current value | Why |
+|------|------|---------------|-----|
+| `A` | `@` | `91.108.106.238` | shared hosting |
+| `A` | `@` | `93.127.173.97` | shared hosting |
+| `AAAA` | `@` | `2a02:4780:...` | **IPv6 — easy to miss** |
+| `A` / `CNAME` | `www` | anything Hostinger | replaced below |
+
+> **Delete the `AAAA` records too.** If you remove only the `A` records, visitors on IPv6
+> connections still reach Hostinger and see the wrong page, while you see the right one.
+> This is the single most common reason a domain move "half works".
+
+#### Keep these — do not touch
+
+| Type | Name | Value | Why |
+|------|------|-------|-----|
+| `MX` | `@` | `mx1.hostinger.com` (priority 5) | **your email** |
+| `MX` | `@` | `mx2.hostinger.com` (priority 10) | **your email** |
+| `TXT` | `@` | SPF / DKIM / verification | email delivery |
+| `CNAME` | `autodiscover`, `autoconfig` etc. | Hostinger | email clients |
+
+Deleting an `MX` record stops mail to your domain immediately.
+
+#### Add what Vercel gave you
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| `A` | `@` | the IP shown on Vercel's Domains page | 300 |
+| `CNAME` | `www` | `cname.vercel-dns.com` | 300 |
+
+**Use the exact values from Vercel's Domains page** — Vercel changes them from time to
+time, so do not copy an IP out of a guide.
 
 DNS takes 15 minutes to a few hours. Check with:
 
 ```powershell
-nslookup eliteclubofficial.com
+nslookup eliteclubofficial.com 8.8.8.8
 ```
+
+When that returns Vercel's IP (and no Hostinger IP), the Domains page in Vercel turns
+green and HTTPS is issued automatically.
 
 When it returns Vercel's IP, the **Domains** page in Vercel turns green and HTTPS is
 issued automatically. No certificate to buy or install.
