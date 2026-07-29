@@ -6,7 +6,7 @@ to "fully working with a live database and file uploads."
 Everything is already coded. You just paste 4–5 keys into `.env.local`, run one SQL file,
 and you're live.
 
-To put it on your Hostinger VPS with your GoDaddy domain, see **[DEPLOY.md](./DEPLOY.md)**.
+To publish it live on Vercel with your domain, see **[DEPLOY.md](./DEPLOY.md)**.
 
 ---
 
@@ -61,6 +61,11 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...          # service_role secret
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
 NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_unsigned_preset
 
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_...          # see step 6
+RAZORPAY_KEY_SECRET=...                           # secret
+RAZORPAY_WEBHOOK_SECRET=any-long-random-string
+
+ADMIN_EMAIL=eliteclub@gmail.com
 ADMIN_PASSWORD=choose-a-strong-password
 ADMIN_SESSION_SECRET=any-long-random-string-here
 ```
@@ -78,27 +83,28 @@ ADMIN_SESSION_SECRET=any-long-random-string-here
 - **Register:** /register · /register/influencer · /register/photographer · /register/videographer
 - **Hire talent:** /hire
 - **Become a partner:** /partner
-- **Admin panel:** http://localhost:3000/admin  (log in with your `ADMIN_PASSWORD`)
+- **Admin panel:** http://localhost:3000/admin  (log in with `ADMIN_EMAIL` + `ADMIN_PASSWORD`)
 
 Submit a test registration, then open the admin panel → **Registrations** to see it,
 view uploaded files, change status, mark verified, mark payment as paid, and add notes.
 
 ---
 
-## 5. Deploy (Hostinger VPS + GoDaddy domain)
+## 5. Deploy (Vercel — free)
 
 Full step-by-step instructions live in **[DEPLOY.md](./DEPLOY.md)**. The short version:
 
-1. Hostinger VPS (Ubuntu 24.04, **2 GB RAM minimum**) → install Node 22, PM2, Nginx.
-2. `git clone` the repo to `/var/www/elite-club`.
-3. Create `.env.local` **on the server** (it is never committed to GitHub).
-4. Run `./scripts/deploy.sh` — installs, builds, starts under PM2.
-5. Point your GoDaddy domain's `A` records at the VPS IP.
-6. Nginx reverse proxy + free SSL via Certbot.
-7. Add the GitHub secrets so every `git push` to `main` deploys automatically.
+1. Connect the GitHub repo to your Vercel project, production branch `main`.
+2. Add every variable from `.env.local` under **Settings → Environment Variables**.
+3. Deploy, and test on the `*.vercel.app` URL.
+4. Add `eliteclubofficial.com` in Vercel, then point its DNS records
+   (edited in **Hostinger hPanel**, since that's where the nameservers are).
+5. Add the Razorpay webhook for the live domain.
 
-> This app needs a real Node.js process (API routes, middleware, server-side DB calls),
-> so Hostinger's **shared web hosting will not run it** — a VPS is required.
+After that, every `git push` publishes automatically. HTTPS is issued for free.
+
+> This app needs a real Node.js runtime (API routes, middleware, server-side DB calls),
+> so Hostinger's **shared web hosting cannot run it**. Keep that plan for email.
 
 ---
 
@@ -154,7 +160,7 @@ RAZORPAY_WEBHOOK_SECRET=the-same-long-random-string
 ```
 
 > Localhost has no public URL, so webhooks can't reach your laptop. Either test the webhook
-> after deploying to your Hostinger VPS (see DEPLOY.md), or tunnel with `npx localtunnel --port 3000`.
+> after deploying to Vercel (see DEPLOY.md), or tunnel with `npx localtunnel --port 3000`.
 
 ### 6e. Test before going live
 
@@ -169,7 +175,7 @@ Then check: the `payments` row shows `status = paid`, and the registration in
 ### 6f. Go live
 
 1. KYC approved → Razorpay Dashboard → switch to **Live Mode** → generate **live** keys.
-2. Replace the keys in `.env.local` **on the VPS** with the `rzp_live_...` pair, then `pm2 reload elite-club --update-env`.
+2. Replace `NEXT_PUBLIC_RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in **Vercel → Settings → Environment Variables** with the `rzp_live_...` pair, then **Redeploy**.
 3. Add a **second webhook** for live mode pointing at the same URL (test and live
    webhooks are configured separately).
 4. Do one real ₹1 test payment to yourself before announcing.
@@ -221,6 +227,6 @@ Every payment is checked against Razorpay's HMAC signature before anything is ma
 | Domain data (states, packages, fees, hero images) | `src/lib/constants.ts` |
 | Database schema (complete) | `supabase-schema.sql` |
 | Payments-only migration (existing DBs) | `supabase-payments.sql` |
-| Deployment | `DEPLOY.md`, `scripts/deploy.sh`, `ecosystem.config.cjs`, `deploy/`, `.github/workflows/` |
+| Deployment | `DEPLOY.md` (Vercel) |
 
 To swap the hero / parallax model photos, edit `HERO_IMAGES` in `src/lib/constants.ts`.

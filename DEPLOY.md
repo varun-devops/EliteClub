@@ -1,283 +1,190 @@
-# Deploying Elite Club — Hostinger VPS + GoDaddy domain
+# Going live — Vercel + eliteclubofficial.com
 
-Your setup: **code on GitHub**, **hosting on Hostinger VPS**, **domain from GoDaddy**.
+Your setup:
 
-This app needs a real Node.js process (it has API routes, middleware, and server-side
-database calls), which is why it runs on a **VPS** and not Hostinger's shared web hosting.
+| Piece | Where |
+|-------|-------|
+| Code | GitHub — `varun-devops/EliteClub` |
+| Hosting | **Vercel** (free plan) — project `prj_ZPN4dtAc5YR7eE7qqtLPSuVhC91T` |
+| Domain | `eliteclubofficial.com` — DNS managed in **Hostinger hPanel** |
+| Database | Supabase |
+| Payments | Razorpay |
 
-Do this once. After that, **every `git push` to `main` deploys automatically.**
+Do steps 1–5 once. After that **every `git push` publishes the site automatically.**
 
----
-
-## 1. Create the VPS
-
-Hostinger **hPanel** → **VPS** → choose a plan → **Ubuntu 24.04** (plain, no panel).
-
-- **Minimum: 2 GB RAM.** The Next.js build needs it. On a 1 GB plan the build gets killed
-  halfway — if you are stuck on 1 GB, add swap (step 2b).
-- Choose the datacenter closest to your users (India).
-- Save the **root password** and the **IP address** it gives you.
+> Your Hostinger **Premium Web Hosting** plan runs PHP only and cannot run this app.
+> Keep it for email on your domain — the website itself runs on Vercel.
 
 ---
 
-## 2. Prepare the server
+## 1. Connect the GitHub repo to your Vercel project
 
-SSH in from your Windows machine (PowerShell):
+1. Go to **https://vercel.com/dashboard** and open your project.
+2. **Settings** → **Git** → **Connect Git Repository**.
+3. Pick `varun-devops/EliteClub`, production branch **`main`**.
+
+Leave the build settings alone — Vercel detects Next.js by itself:
+
+| Setting | Value |
+|---------|-------|
+| Framework Preset | Next.js |
+| Build Command | `next build` (default) |
+| Install Command | `npm install` (default) |
+| Output Directory | leave empty |
+| Node.js Version | 22.x |
+
+---
+
+## 2. Add your environment variables
+
+**Settings** → **Environment Variables**. Add each one below, ticked for
+**Production**, **Preview** and **Development**.
+
+Copy the values from your local `.env.local`.
+
+| Name | Notes |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | from Supabase → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | **secret** — service_role key |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | |
+| `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` | the unsigned preset |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | `rzp_test_…` for now |
+| `RAZORPAY_KEY_SECRET` | **secret** |
+| `RAZORPAY_WEBHOOK_SECRET` | any long random string — you'll paste the same one into Razorpay in step 5 |
+| `ADMIN_EMAIL` | `eliteclub@gmail.com` |
+| `ADMIN_PASSWORD` | your admin password |
+| `ADMIN_SESSION_SECRET` | long random string |
+
+> **Changing a variable later does not update the live site by itself.**
+> After editing, go to **Deployments** → latest → **⋯** → **Redeploy**.
+
+Generate a random string with:
 
 ```powershell
-ssh root@YOUR_VPS_IP
-```
-
-### 2a. Install what's needed
-
-```bash
-apt update && apt upgrade -y
-apt install -y curl git nginx ufw
-
-# Node.js 22 LTS
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt install -y nodejs
-
-# PM2 — keeps the app running and restarts it after a reboot
-npm install -g pm2
-
-node -v && npm -v    # confirm
-```
-
-### 2b. Add swap (skip if you have 4 GB+ RAM)
-
-Insurance against the build being killed for running out of memory:
-
-```bash
-fallocate -l 2G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-free -h    # should now show 2Gi swap
-```
-
-### 2c. Firewall
-
-```bash
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw --force enable
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ---
 
-## 3. Get the code onto the server
+## 3. First deploy
 
-```bash
-mkdir -p /var/www
-cd /var/www
-git clone https://github.com/varun-devops/EliteClub.git elite-club
-cd elite-club
-```
+**Deployments** → **Redeploy** (or just push any commit).
 
-> Private repo? Create a deploy key first:
-> `ssh-keygen -t ed25519 -C "vps" -f ~/.ssh/id_ed25519 -N ""` then `cat ~/.ssh/id_ed25519.pub`
-> and add it under **GitHub → repo → Settings → Deploy keys** (read access is enough).
-> Then clone with the SSH URL: `git@github.com:varun-devops/EliteClub.git`
+When it goes green, open the `*.vercel.app` URL Vercel gives you and check:
+
+- the home page loads
+- `/register/photographer` submits successfully
+- `/admin` accepts your email + password
+
+Fix anything broken here **before** attaching the real domain.
 
 ---
 
-## 4. Create `.env.local` on the server
+## 4. Point eliteclubofficial.com at Vercel
 
-**This file is not in GitHub** — it holds your secrets, so you create it once by hand.
+### 4a. Tell Vercel about the domain
 
-```bash
-nano /var/www/elite-club/.env.local
-```
+**Settings** → **Domains** → **Add** → `eliteclubofficial.com`.
+Add `www.eliteclubofficial.com` too and let Vercel redirect one to the other.
 
-Paste this, with your real values:
+Vercel will show you the DNS records it wants. They will look like this:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
+| Type | Name | Value |
+|------|------|-------|
+| A | `@` | `76.76.21.21` |
+| CNAME | `www` | `cname.vercel-dns.com` |
 
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_unsigned_preset
+**Use the exact values Vercel shows you**, not the ones above — they change.
 
-NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_TJ3QvQ4tL6nJBm
-RAZORPAY_KEY_SECRET=81kXJ3YViuDtq0tF6dWuyWdI
-RAZORPAY_WEBHOOK_SECRET=make-up-a-long-random-string-here
+### 4b. Update DNS in Hostinger
 
-ADMIN_PASSWORD=your-strong-admin-password
-ADMIN_SESSION_SECRET=a-long-random-string
-```
+Your nameservers are Hostinger's (`atlas.dns-parking.com` / `hyperion.dns-parking.com`),
+so DNS is edited in Hostinger — **not** GoDaddy.
 
-Save with `Ctrl+O`, `Enter`, `Ctrl+X`. Then lock it down:
+hPanel → **Domains** → `eliteclubofficial.com` → **DNS / Nameservers** → **DNS Records**.
 
-```bash
-chmod 600 /var/www/elite-club/.env.local
-```
+1. **Delete** the existing `A` record for `@` that points to `157.173.216.160`
+   (that is your shared-hosting IP).
+2. **Delete** the existing `CNAME` for `www`, if there is one.
+3. **Add** the records Vercel gave you in step 4a.
+4. Leave `MX` and `TXT` records **alone** — those are your email. Deleting them breaks it.
 
-> Generate the random strings with:
-> `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-
----
-
-## 5. First deploy
-
-```bash
-cd /var/www/elite-club
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
-
-It installs, builds, and starts the app under PM2. It should end with
-`✓ Deployed — app is responding`.
-
-Make PM2 survive reboots:
-
-```bash
-pm2 startup systemd     # prints a command — copy and run it
-pm2 save
-```
-
-Check it's alive: `curl -I http://127.0.0.1:3000` → `HTTP/1.1 200 OK`
-
----
-
-## 6. Point your GoDaddy domain at the VPS
-
-GoDaddy → **My Products** → your domain → **DNS** → **Manage Zones**.
-
-Delete any existing `A` record for `@` and `www`, then add:
-
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | `@` | `YOUR_VPS_IP` | 600 |
-| A | `www` | `YOUR_VPS_IP` | 600 |
-
-Do **not** use GoDaddy's "Forwarding" — it breaks HTTPS and the payment callbacks.
-
-DNS takes 15 minutes to a few hours. Check progress:
-
-```bash
-nslookup YOUR-DOMAIN.com
-```
-
-Wait until it returns your VPS IP before doing step 7 — Certbot will fail otherwise.
-
----
-
-## 7. Nginx + free SSL
-
-```bash
-cd /var/www/elite-club
-cp deploy/nginx.conf.example /etc/nginx/sites-available/elite-club
-nano /etc/nginx/sites-available/elite-club     # replace YOUR-DOMAIN.com (2 places)
-
-ln -sf /etc/nginx/sites-available/elite-club /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
-```
-
-Now the free SSL certificate:
-
-```bash
-apt install -y certbot python3-certbot-nginx
-certbot --nginx -d YOUR-DOMAIN.com -d www.YOUR-DOMAIN.com
-```
-
-Choose **redirect HTTP to HTTPS** when asked. Renewal is automatic.
-
-Open `https://YOUR-DOMAIN.com` — the site should be live with a padlock.
-
----
-
-## 8. Auto-deploy from GitHub
-
-So that pushing to `main` updates the live site by itself.
-
-### 8a. Make a key for GitHub to use
-
-On the **VPS**:
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github_deploy -N ""
-cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-cat ~/.ssh/github_deploy          # ← copy ALL of this, including BEGIN/END lines
-```
-
-### 8b. Add the secrets to GitHub
-
-GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
-
-| Secret name | Value |
-|-------------|-------|
-| `VPS_HOST` | your VPS IP |
-| `VPS_USER` | `root` |
-| `VPS_SSH_KEY` | the whole private key you just copied |
-| `VPS_PORT` | `22` (optional) |
-
-### 8c. Test it
+DNS takes 15 minutes to a few hours. Check with:
 
 ```powershell
-git commit --allow-empty -m "test auto-deploy"
-git push
+nslookup eliteclubofficial.com
 ```
 
-Watch it run under the repo's **Actions** tab. Green tick = the live site is updated.
+When it returns Vercel's IP, the **Domains** page in Vercel turns green and HTTPS is
+issued automatically. No certificate to buy or install.
 
 ---
 
-## 9. Point Razorpay at your live domain
+## 5. Point Razorpay at the live domain
 
-Now that you have a real HTTPS URL, webhooks can reach you.
+Now that you have a real HTTPS address, webhooks can reach you.
 
 Razorpay Dashboard → **Settings** → **Webhooks** → **Add New Webhook**:
 
 | Field | Value |
 |-------|-------|
-| Webhook URL | `https://YOUR-DOMAIN.com/api/payment/webhook` |
-| Secret | the exact `RAZORPAY_WEBHOOK_SECRET` from your `.env.local` |
+| Webhook URL | `https://eliteclubofficial.com/api/payment/webhook` |
+| Secret | the exact same string as `RAZORPAY_WEBHOOK_SECRET` in Vercel |
 | Active Events | `payment.captured`, `payment.failed` |
 
-Then do a full test payment on the live site with UPI `success@razorpay`, and confirm the
-record flips to **Paid** in `/admin`.
+Then test the whole flow on the live site:
+
+1. Go to `/hire` and post a requirement (₹1,100 fee).
+2. Pay with test UPI `success@razorpay`.
+3. Open `/admin` → **Payments** — the transaction should show **paid**.
 
 > Test and Live mode have **separate** webhooks. When you switch to `rzp_live_` keys,
 > add the webhook again in Live mode.
 
 ---
 
-## Everyday commands
+## Everyday use
 
-| What | Command (on the VPS) |
-|------|----------------------|
-| Deploy manually | `cd /var/www/elite-club && ./scripts/deploy.sh` |
-| See logs | `pm2 logs elite-club` |
-| Restart | `pm2 reload elite-club` |
-| Status | `pm2 status` |
-| Change a secret | `nano .env.local` then `pm2 reload elite-club --update-env` |
-| Nginx logs | `tail -f /var/log/nginx/error.log` |
-
-**After editing `.env.local` you must reload PM2** — the app only reads it at startup.
+| What | How |
+|------|-----|
+| Publish a change | `git push` — Vercel builds and deploys on its own |
+| See build logs | Vercel → **Deployments** → click the build |
+| Change a secret | **Settings** → **Environment Variables**, then **Redeploy** |
+| Undo a bad deploy | **Deployments** → pick the last good one → **Promote to Production** |
+| Runtime errors | Vercel → **Logs** |
 
 ---
 
 ## When something breaks
 
-**502 Bad Gateway** — the Node app is down. `pm2 status`, then `pm2 logs elite-club`.
+**Build fails: "supabaseUrl is required"** — an environment variable is missing in Vercel.
+Add it, then redeploy.
 
-**Build killed / "JavaScript heap out of memory"** — not enough RAM. Add swap (step 2b) or
-move to a bigger plan.
+**Site works but forms fail** — `SUPABASE_SERVICE_ROLE_KEY` is missing or wrong. It is the
+`service_role` key, not the `anon` one.
 
-**Site loads but forms fail** — `.env.local` is missing or wrong on the server. Check
-`cat /var/www/elite-club/.env.local`, then `pm2 reload elite-club --update-env`.
+**"Online payment is not enabled yet"** — `NEXT_PUBLIC_RAZORPAY_KEY_ID` or
+`RAZORPAY_KEY_SECRET` is missing in Vercel. Note that `NEXT_PUBLIC_*` values are baked in at
+**build** time, so you must **redeploy** after adding them — a restart is not enough.
 
-**Payments say "not enabled"** — the Razorpay keys aren't reaching the app. Same fix as above.
+**Domain stuck on "Invalid Configuration"** — the old Hostinger `A` record is still there.
+Delete it. Only Vercel's records should remain for `@` and `www`.
 
-**Webhook shows failed in the Razorpay dashboard** — the secret in `.env.local` must match
-the one typed into Razorpay *character for character*.
+**Webhook failing in the Razorpay dashboard** — the secret must match Vercel's
+`RAZORPAY_WEBHOOK_SECRET` character for character.
 
-**Certbot fails** — DNS hasn't propagated. `nslookup YOUR-DOMAIN.com` must return your VPS IP
-first.
+**Email stopped working** — an `MX` record was deleted during step 4b. Restore it in
+hPanel; Hostinger's default `MX` records are documented in their knowledge base.
 
-**Admin login won't stick** — the `X-Forwarded-Proto` header is missing, so the Secure cookie
-is dropped. Make sure you're using the provided Nginx config and are on `https://`.
+---
+
+## If you ever move to a VPS
+
+The Hostinger VPS setup (PM2, Nginx, deploy script, GitHub Actions) was written and
+tested — it is kept in git history, not deleted:
+
+```bash
+git show 5c695cb --stat
+git checkout 5c695cb -- scripts deploy ecosystem.config.cjs .github
+```
